@@ -52,7 +52,7 @@ async def get_users(
     )
     
     return paginator.build_paginated_response(
-        items=[user.to_dict(excludes=['password', 'is_superuser']) for user in users],
+        items=[user.to_dict() for user in users],
         endpoint='/users',
         page=page,
         size=per_page,
