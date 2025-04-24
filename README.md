@@ -1,1 +1,1 @@
-# GreenTrac API
+# FastAPI Base Template
