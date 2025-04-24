@@ -316,7 +316,7 @@ async def reset_password(token: str, payload: auth_schemas.ResetPassword, db: Se
     user_id = AuthService.verify_password_reset_token(db, token)
     
     # Update user password
-    password_hash = AuthService.hash_password(payload.password)
+    password_hash = AuthService.hash_secret(payload.password)
     User.update(db, id=user_id, password=password_hash)
     
     return success_response(

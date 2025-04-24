@@ -55,7 +55,7 @@ class AuthService:
         return user, None, None
     
     @classmethod
-    def hash_password(cls, secret: str):
+    def hash_secret(cls, secret: str):
         return pwd_context.hash(secret)
     
     @classmethod
