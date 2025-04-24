@@ -3,7 +3,7 @@ from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from decouple import config
 
-from api.core.dependencies.email.email_sending_service import send_email
+from api.core.dependencies.email_sending_service import send_email
 from api.utils.loggers import create_logger
 from api.utils.telex_notification import TelexNotification
 from api.v1.models.token import TokenType

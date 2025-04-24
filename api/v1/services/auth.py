@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from decouple import config
 
-from api.core.dependencies.email.email_sending_service import send_email
+from api.core.dependencies.email_sending_service import send_email
 from api.db.database import get_db
 from api.utils.loggers import create_logger
 from api.utils.settings import settings

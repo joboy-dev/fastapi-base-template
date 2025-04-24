@@ -24,9 +24,8 @@ from api.utils.settings import settings
 
 create_database()
 
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.ERROR)
-logger = create_logger(__name__)
+logger = create_logger(__name__, log_file='logs/error.log')
+# performance_logger = create_logger(__name__, log_file='logs/performance.log')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,13 +33,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title='GreenTrac API Documentation'
+    title='API Documentation'
 )
 
 # Mount Jinja templates and static files
-email_templates = Jinja2Templates(directory='api/core/dependencies/email/templates')
-EMAIL_STATIC_DIR = 'api/core/dependencies/email/static'
-app.mount(f'/{EMAIL_STATIC_DIR}', StaticFiles(directory=EMAIL_STATIC_DIR), name='email-static')
+# email_templates = Jinja2Templates(directory='api/core/dependencies/email/templates')
+# EMAIL_STATIC_DIR = 'api/core/dependencies/email/static'
+# app.mount(f'/{EMAIL_STATIC_DIR}', StaticFiles(directory=EMAIL_STATIC_DIR), name='email-static')
 
 TEMP_DIR = './tmp/media'
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -91,13 +90,13 @@ async def log_requests(request: Request, call_next):
     logger.info(log_string)
     
     # Send notification to Telex if an endpoint executes in more than 5 seconds
-    if process_time > 5:
-        TelexNotification(webhook_id='0196339e-d3d0-7916-9e95-259cdcc4e790').send_notification(
-            event_name='Performance Check',
-            message=f"Performance issue on {method}-{url} {status_code}.\nThe endpoint is taking {formatted_process_time} to execute.\nCheck it out.",
-            status='error',
-            username='GreenTrac Performance Reporter'
-        )
+    # if process_time > 5:
+    #     TelexNotification(webhook_id='01963c21-6423-7969-8860-a700224c36e1').send_notification(
+    #         event_name='Performance Check',
+    #         message=f"Performance issue on {method}-{url} {status_code}.\nThe endpoint is taking {formatted_process_time} to execute.\nCheck it out.",
+    #         status='error',
+    #         username='Wren Performance Reporter'
+    #     )
 
     return response
 
@@ -114,10 +113,13 @@ async def root(request: Request) -> dict:
 
 
 @app.get("/logs", tags=["Home"])
-async def stream_logs(lines: Optional[int] = Query(None)):
+async def stream_logs(
+    lines: Optional[int] = Query(None), 
+    log_file: Optional[str] = Query('app_logs')
+) -> StreamingResponse:
     '''Endpoint to stream logs'''
     
-    return StreamingResponse(log_streamer('logs/app_logs.log', lines), media_type="text/event-stream")
+    return StreamingResponse(log_streamer(f'logs/{log_file}.log', lines), media_type="text/event-stream")
 
 
 # REGISTER EXCEPTION HANDLERS
@@ -127,14 +129,7 @@ async def http_exception(request: Request, exc: HTTPException):
 
     exc_type, exc_obj, exc_tb = sys.exc_info()
     logger.error(f"HTTPException: {request.url.path} | {exc.status_code} | {exc.detail}", stacklevel=2)
-    logger.error(f"[ERROR] - An error occured | {exc}, {exc_type} {exc_obj} line {exc_tb.tb_lineno}", stacklevel=2)
-    
-    # TelexNotification(webhook_id='01962f17-9cf2-7902-8ff5-00f40a1d1da5').send_notification(
-    #     event_name='HTTPException',
-    #     message=f"[ERROR] - An error occured on {request.url.path} - {exc.status_code}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
-    #     status='error',
-    #     username='GreenTrac Error Logger'
-    # )
+    # logger.error(f"[ERROR] - An error occured | {exc}, {exc_type} {exc_obj} line {exc_tb.tb_lineno}", stacklevel=2)
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -178,12 +173,12 @@ async def integrity_exception(request: Request, exc: IntegrityError):
     logger.error(f"Exception occured | {request.url.path} | 500", stacklevel=2)
     logger.error(f"[ERROR] - An error occured | {exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}", stacklevel=2)
     
-    TelexNotification(webhook_id='01962f17-9cf2-7902-8ff5-00f40a1d1da5').send_notification(
-        event_name='Integrity error',
-        message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
-        status='error',
-        username='GreenTrac Error Logger'
-    )
+    # TelexNotification(webhook_id='01963c21-4279-7969-8d3c-0f7ce4ae824b').send_notification(
+    #     event_name='Integrity error',
+    #     message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
+    #     status='error',
+    #     username='Wren Error Logger'
+    # )
 
     return JSONResponse(
         status_code=500,
@@ -203,12 +198,12 @@ async def exception(request: Request, exc: Exception):
     logger.error(f"Exception occured | {request.url.path} | 500", stacklevel=2)
     logger.error(f"[ERROR] - An error occured | {exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}", stacklevel=2)    
     
-    TelexNotification(webhook_id='01962f17-9cf2-7902-8ff5-00f40a1d1da5').send_notification(
-        event_name='Exception',
-        message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
-        status='error',
-        username='GreenTrac Error Logger'
-    )
+    # TelexNotification(webhook_id='01963c21-4279-7969-8d3c-0f7ce4ae824b').send_notification(
+    #     event_name='Exception',
+    #     message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
+    #     status='error',
+    #     username='Wren Error Logger'
+    # )
 
     return JSONResponse(
         status_code=500,
