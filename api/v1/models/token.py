@@ -1,5 +1,6 @@
 import sqlalchemy as sa, enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from api.core.base.base_model import BaseTableModel
 
@@ -20,10 +21,9 @@ class Token(BaseTableModel):
     token_type = sa.Column(sa.String, server_default=TokenType.ACCESS.value)
     expiry_time = sa.Column(sa.DateTime, nullable=False)
     
-    user_id = sa.Column(sa.String, sa.ForeignKey('users.id'), nullable=True)
-    user = relationship('User', backref='tokens')
+    user_id = sa.Column(sa.String, nullable=True)
     
-    # @hybridproperty
+    @hybrid_property
     def is_expired(self):
         return self.expiry_time < sa.func.now()
 
@@ -32,6 +32,4 @@ class BlacklistedToken(BaseTableModel):
     __tablename__ = 'blacklisted_tokens'
     
     token = sa.Column(sa.String, nullable=False)
-    
-    user_id = sa.Column(sa.String, sa.ForeignKey('users.id'), nullable=True)
-    user = relationship('User', backref='blacklisted_tokens')
+    user_id = sa.Column(sa.String, nullable=True)

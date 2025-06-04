@@ -1,6 +1,7 @@
 import sys
 import uvicorn, os, time
 from typing import Optional
+from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, Request, Query
 from fastapi.templating import Jinja2Templates
@@ -88,15 +89,6 @@ async def log_requests(request: Request, call_next):
 
     # Log the formatted string
     logger.info(log_string)
-    
-    # Send notification to Telex if an endpoint executes in more than 5 seconds
-    # if process_time > 5:
-    #     TelexNotification(webhook_id='01963c21-6423-7969-8860-a700224c36e1').send_notification(
-    #         event_name='Performance Check',
-    #         message=f"Performance issue on {method}-{url} {status_code}.\nThe endpoint is taking {formatted_process_time} to execute.\nCheck it out.",
-    #         status='error',
-    #         username='Wren Performance Reporter'
-    #     )
 
     return response
 
@@ -145,8 +137,17 @@ async def http_exception(request: Request, exc: HTTPException):
 async def validation_exception(request: Request, exc: RequestValidationError):
     """Validation exception handler"""
 
+    # errors = [
+    #     {
+    #         "loc": error["loc"], 
+    #         "msg": error["msg"].split(',')[-1].strip(), 
+    #         "type": error["type"],
+    #         "detailed_message": f"{error['type'].capitalize()} {error['loc'][0]}: {error['loc'][1]}- {error['msg'].split(',')[-1].strip()}"
+    #     } for error in exc.errors()
+    # ]
+    
     errors = [
-        {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+        f"{error['type'].capitalize()} {error['loc'][0]}: {error['loc'][1]}- {error['msg'].split(',')[-1].strip()}"
         for error in exc.errors()
     ]
 
@@ -170,15 +171,21 @@ async def integrity_exception(request: Request, exc: IntegrityError):
     """Integrity error exception handlers"""
 
     exc_type, exc_obj, exc_tb = sys.exc_info()
-    logger.error(f"Exception occured | {request.url.path} | 500", stacklevel=2)
+    logger.error(f"Integrity error occured | {request.url.path} | 500", stacklevel=2)
     logger.error(f"[ERROR] - An error occured | {exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}", stacklevel=2)
     
-    # TelexNotification(webhook_id='01963c21-4279-7969-8d3c-0f7ce4ae824b').send_notification(
-    #     event_name='Integrity error',
-    #     message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
-    #     status='error',
-    #     username='Wren Error Logger'
-    # )
+    if isinstance(exc.orig, UniqueViolation):
+        constraint = getattr(exc.orig.diag, "constraint_name", None)
+        
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": False,
+                "status_code": 400,
+                # "message": f"Unique constraint for key {constraint} violated",
+                "message": f"{constraint.split('_')[-1].capitalize()} with the provided value already exists",
+            },
+        )
 
     return JSONResponse(
         status_code=500,
@@ -197,13 +204,6 @@ async def exception(request: Request, exc: Exception):
     exc_type, exc_obj, exc_tb = sys.exc_info()
     logger.error(f"Exception occured | {request.url.path} | 500", stacklevel=2)
     logger.error(f"[ERROR] - An error occured | {exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}", stacklevel=2)    
-    
-    # TelexNotification(webhook_id='01963c21-4279-7969-8d3c-0f7ce4ae824b').send_notification(
-    #     event_name='Exception',
-    #     message=f"[ERROR] - An error occured on {request.url.path}\n{exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}",
-    #     status='error',
-    #     username='Wren Error Logger'
-    # )
 
     return JSONResponse(
         status_code=500,

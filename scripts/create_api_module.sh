@@ -46,6 +46,7 @@ from api.utils.settings import settings
 from api.v1.models.user import User
 from api.v1.models.${file_name} import ${file_name^}
 from api.v1.services.auth import AuthService
+from api.v1.schemas.auth import AuthenticatedEntity
 from api.v1.services.${file_name} import ${file_name^}Service
 from api.v1.schemas import ${file_name} as ${file_name}_schemas
 from api.utils.loggers import create_logger
@@ -67,9 +68,11 @@ async def create_${file_name}(
         **payload.model_dump(exclude_unset=True)
     )
 
+    logger.info(f'${file_name^} with id {${file_name}.id} created')
+
     return success_response(
         message=f"${file_name^} created successfully",
-        status_code=200,
+        status_code=201,
         data=${file_name}.to_dict()
     )
 
@@ -86,7 +89,7 @@ async def get_${file_name}s(
 ):
     """Endpoint to get all ${file_name}s"""
 
-    ${file_name}s, count = ${file_name^}.all(
+    query, ${file_name}s, count = ${file_name^}.fetch_by_field(
         db, 
         sort_by=sort_by,
         order=order.lower(),
@@ -112,7 +115,7 @@ async def get_${file_name}_by_id(
     db: Session=Depends(get_db), 
     entity: AuthenticatedEntity=Depends(AuthService.get_current_user_entity)
 ):
-    """Endpoint to get a ${file_name} by ID"""
+    """Endpoint to get a ${file_name} by ID or unique_id in case ID fails."""
 
     ${file_name} = ${file_name^}.fetch_by_id(db, id)
     
@@ -138,6 +141,8 @@ async def update_${file_name}(
         **payload.model_dump(exclude_unset=True)
     )
 
+    logger.info(f'${file_name^} with id {${file_name}.id} updated')
+
     return success_response(
         message=f"${file_name^} updated successfully",
         status_code=200,
@@ -157,8 +162,7 @@ async def delete_${file_name}(
 
     return success_response(
         message=f"Deleted successfully",
-        status_code=200,
-        data={"id": id}
+        status_code=200
     )
 
 EOF

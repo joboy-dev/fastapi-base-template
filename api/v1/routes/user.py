@@ -38,7 +38,7 @@ async def get_users(
         user (User, optional): Current user. Defaults to Depends(AuthService.get_current_superuser).
     """
     
-    users, count = User.all(
+    users, count = User.fetch_by_field(
         db, 
         sort_by=sort_by,
         order=order.lower(),
@@ -94,7 +94,7 @@ async def get_user_by_id(
     return success_response(
         status_code=200,
         message='User fetched successfully',
-        data=user.to_dict(excludes=['password', 'is_superuser'])
+        data=user.to_dict()
     )
 
 @user_router.patch('/me', status_code=200, response_model=success_response)
@@ -236,3 +236,4 @@ async def delete_user(
         status_code=200,
         message='User deleted'
     )
+

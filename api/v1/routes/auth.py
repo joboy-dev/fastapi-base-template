@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Cookie, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from decouple import config
@@ -21,7 +21,11 @@ APP_URL = config("APP_URL")
 logger = create_logger(__name__)
 
 @auth_router.post('/register', status_code=201, response_model=success_response)
-async def register(payload: auth_schemas.CreateUser, db: Session=Depends(get_db)):
+async def register(
+    bg_tasks: BackgroundTasks,
+    payload: auth_schemas.CreateUser, 
+    db: Session=Depends(get_db)
+):
     """Endpoint to create a new user
 
     Args:
@@ -29,7 +33,7 @@ async def register(payload: auth_schemas.CreateUser, db: Session=Depends(get_db)
         db (Session, optional): Database session. Defaults to Depends(get_db).
     """
     
-    new_user, access_token, refresh_token = await UserService.create(db, payload)
+    new_user, access_token, refresh_token = UserService.create(db, payload, bg_tasks)
     
     logger.info(f'User {new_user.email} created successfully')
         
@@ -39,10 +43,7 @@ async def register(payload: auth_schemas.CreateUser, db: Session=Depends(get_db)
         data={
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                **new_user.to_dict(excludes=['password', 'is_superuser']),
-                'profile': new_user.profile.to_dict()
-            },
+            'user': new_user.to_dict(),
         }
     )
     
@@ -74,13 +75,6 @@ async def login(payload: auth_schemas.LoginSchema, db: Session=Depends(get_db)):
         password=payload.password
     )
     
-    # TelexNotification(webhook_id='01962f17-c9fe-7902-8356-6483863464a8').send_notification(
-    #     event_name='User Login',
-    #     message=f'User {user.email} logged in at {user.last_login}',
-    #     status='success',
-    #     username='GreenTrac Login'
-    # )
-    
     logger.info(f'User {user.email} logged in successfully')
     
     response = success_response(
@@ -89,10 +83,7 @@ async def login(payload: auth_schemas.LoginSchema, db: Session=Depends(get_db)):
         data={
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                **user.to_dict(excludes=['password', 'is_superuser']),
-                'profile': user.profile.to_dict()
-            },
+            'user': user.to_dict(),
         }
     )
     
@@ -110,7 +101,11 @@ async def login(payload: auth_schemas.LoginSchema, db: Session=Depends(get_db)):
 
 
 @auth_router.post('/magic', status_code=200, response_model=success_response)
-async def magic_login(payload: auth_schemas.MagicLoginRequest, db: Session=Depends(get_db)):
+async def magic_login(
+    bg_tasks: BackgroundTasks,
+    payload: auth_schemas.MagicLoginRequest, 
+    db: Session=Depends(get_db)
+):
     """Endpoint to request a magic login link
 
     Args:
@@ -118,7 +113,7 @@ async def magic_login(payload: auth_schemas.MagicLoginRequest, db: Session=Depen
         db (Session, optional): Database session. Defaults to Depends(get_db).
     """
     
-    token = await AuthService.send_magic_link(db, payload.email)
+    token = AuthService.send_magic_link(db, payload.email, bg_tasks)
     
     return success_response(
         status_code=200,
@@ -143,23 +138,13 @@ async def magic_login_verify(token: str, db: Session=Depends(get_db)):
         token=token,
     )
     
-    # TelexNotification(webhook_id='01962f17-c9fe-7902-8356-6483863464a8').send_notification(
-    #     event_name='User Login',
-    #     message=f'User {user.email} logged in at {user.last_login} with magic link',
-    #     status='success',
-    #     username='GreenTrac Login'
-    # )
-    
     response = success_response(
         status_code=200,
         message='Logged in successfully',
         data={
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                **user.to_dict(excludes=['password', 'is_superuser']),
-                'profile': user.profile.to_dict()
-            },
+            'user': user.to_dict()
         }
     )
     
@@ -206,10 +191,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         data={
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                **user.to_dict(excludes=['password', 'is_superuser']),
-                'profile': user.profile.to_dict()
-            },
+            'user': user.to_dict(),
         }
     )
     
@@ -263,10 +245,7 @@ async def google_login(
         data={
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                **user.to_dict(excludes=['password', 'is_superuser']),
-                'profile': user.profile.to_dict()
-            },
+            'user': user.to_dict(),
         }
     )
     
@@ -284,7 +263,11 @@ async def google_login(
     
     
 @auth_router.post('/password-reset/request', status_code=200, response_model=success_response)
-async def password_reset_request(payload: auth_schemas.ResetPasswordRequest, db: Session=Depends(get_db)):
+async def password_reset_request(
+    bg_tasks: BackgroundTasks,
+    payload: auth_schemas.ResetPasswordRequest, 
+    db: Session=Depends(get_db)
+):
     """Endpoint to request a password reset link
 
     Args:
@@ -292,7 +275,7 @@ async def password_reset_request(payload: auth_schemas.ResetPasswordRequest, db:
         db (Session, optional): Database session. Defaults to Depends(get_db).
     """
     
-    token = await AuthService.send_password_reset_link(db, payload.email)
+    token = AuthService.send_password_reset_link(db, payload.email, bg_tasks)
     
     return success_response(
         status_code=200,
@@ -380,3 +363,4 @@ async def logout(db: Session=Depends(get_db), current_user: User=Depends(AuthSer
     response.delete_cookie('refresh_token')
     
     return response
+

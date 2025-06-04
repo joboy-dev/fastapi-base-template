@@ -105,13 +105,18 @@ def build_model_paginated_response(
     )
     
     response = {
-        "current_page": page_number,
-        "size": page_size,
-        "total": count,
-        "pages": total_pages,
-        "previous_page": pointers["previous"],
-        "next_page": pointers["next"],
-        "items": items,
+        "status_code": 200,
+        "success": True,
+        "message": "Items fetched successfully",
+        "pagination_data": {
+            "current_page": page_number,
+            "size": page_size,
+            "total": count,
+            "pages": total_pages,
+            "previous_page": pointers["previous"],
+            "next_page": pointers["next"],
+        },
+        "data": items,
     }
 
     return response
@@ -147,13 +152,19 @@ def build_paginated_response(
     )
     
     response = {
-        "current_page": page_number,
-        "size": page_size,
-        "total": total,
-        "pages": total_pages,
-        "previous_page": pointers["previous"],
-        "next_page": pointers["next"],
-        "items": items,
+        "status_code": 200,
+        "success": True,
+        "message": "Items fetched successfully",
+        "pagination_data": {
+            "current_page": page_number,
+            "size": page_size,
+            "total": total,
+            "pages": total_pages,
+            "previous_page": pointers["previous"],
+            "next_page": pointers["next"],
+        },
+        "data": items,
     }
 
     return response
+
