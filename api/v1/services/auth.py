@@ -207,7 +207,7 @@ class AuthService:
             status_code=401, detail="Invalid token"
         )
         
-        user_id = cls.verify_token(
+        user_id, _ = cls.verify_token(
             db=db,
             token=token,
             expected_token_type=TokenType.MAGIC.value,
@@ -266,7 +266,7 @@ class AuthService:
             status_code=401, detail="Invalid token"
         )
         
-        user_id = cls.verify_token(
+        user_id, _ = cls.verify_token(
             db=db,
             token=token,
             expected_token_type=TokenType.PASSWORD_RESET.value,

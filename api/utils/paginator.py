@@ -168,3 +168,7 @@ def build_paginated_response(
 
     return response
 
+def paginate_query(query, page: int, per_page: int):
+    count = query.count()
+    offset = (page - 1) * per_page
+    return query.offset(offset).limit(per_page).all(), count
