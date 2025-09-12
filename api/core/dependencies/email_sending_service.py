@@ -9,7 +9,7 @@ import pdfkit
 
 from api.utils.loggers import create_logger
 from api.utils.settings import settings
-from config import config
+from decouple import config
 
 
 logger = create_logger(__name__, log_file='logs/email.log')
