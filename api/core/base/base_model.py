@@ -23,7 +23,7 @@ class BaseTableModel(Base):
     
     id = sa.Column(sa.String, primary_key=True, index=True, default=lambda: str(uuid4().hex))
     unique_id = sa.Column(sa.String, nullable=True)
-    is_deleted = sa.Column(sa.Boolean, server_default='false')
+    is_deleted = sa.Column(sa.Boolean, default=False)
     created_at = sa.Column(sa.DateTime(timezone=True), default=datetime.now(timezone.utc))
     updated_at = sa.Column(sa.DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
@@ -78,11 +78,11 @@ class BaseTableModel(Base):
 
     @classmethod
     def all(
-        cls, 
+        cls,
         db: Session,
-        page: int = 1, 
-        per_page: int = 10, 
-        sort_by: str = "created_at", 
+        page: int = 1,
+        per_page: int = 10,
+        sort_by: str = "created_at",
         order: str = "desc",
         show_deleted: bool = False,
         search_fields: Optional[Dict[str, Any]] = None
@@ -130,17 +130,41 @@ class BaseTableModel(Base):
 
     @classmethod
     def fetch_one_by_field(
-        cls, 
-        db: Session, 
-        throw_error: bool=True, 
-        error_message: Optional[str] = None, 
-        status_code: int = 404, 
+        cls,
+        db: Session,
+        throw_error: bool=True,
+        error_message: Optional[str] = None,
+        status_code: int = 404,
+        filter_expr=None,
         **kwargs
     ):
-        """Fetches one unique record that match the given field(s)"""
-        
-        kwargs["is_deleted"] = False
-        obj = db.query(cls).filter_by(**kwargs).first()
+        """
+        Fetches one unique record that matches the given field(s).
+        Supports complex queries via SQLAlchemy expressions (e.g., or_(), and_()).
+
+        Args:
+            db: SQLAlchemy session.
+            throw_error: Whether to raise an error if not found.
+            error_message: Custom error message.
+            status_code: HTTP status code for error.
+            filter_expr: Optional SQLAlchemy filter expression (e.g., or_(), and_()).
+            **kwargs: Field-based filters (exact match).
+        """
+        # Always filter out soft-deleted records unless explicitly overridden
+        if "is_deleted" not in kwargs and hasattr(cls, "is_deleted"):
+            kwargs["is_deleted"] = False
+
+        query = db.query(cls)
+
+        # Apply field-based filters
+        if kwargs:
+            query = query.filter_by(**kwargs)
+
+        # Apply complex filter expressions if provided
+        if filter_expr is not None:
+            query = query.filter(filter_expr)
+
+        obj = query.first()
         if obj is None and throw_error:
             raise HTTPException(status_code=status_code, detail=error_message or f"Record not found in table `{cls.__tablename__}`")
         return obj
@@ -148,50 +172,55 @@ class BaseTableModel(Base):
     
     @classmethod
     def fetch_by_field(
-        cls, 
+        cls,
         db: Session,
-        page: Optional[int] = 1, 
-        per_page: Optional[int] = 10,  
-        order: str='desc', 
+        page: Optional[int] = 1,
+        per_page: Optional[int] = 10,
+        order: str = 'desc',
         sort_by: str = "created_at",
         show_deleted: bool = False,
         search_fields: Optional[Dict[str, Any]] = None,
         ignore_none_kwarg: bool = True,
         paginate: bool = True,
+        filter_expr=None,
         **kwargs
     ):
-        """Fetches all records that match the given field(s)"""
-        
+        """
+        Fetches all records that match the given field(s), supporting complex SQLAlchemy filter expressions
+        such as and_(), or_(), etc. via the filter_expr argument.
+        """
         query = db.query(cls)
-    
+
         # Handle is_deleted logic
         if not show_deleted and hasattr(cls, "is_deleted"):
             query = query.filter(cls.is_deleted == False)
-        
+
         # Dynamic kwargs filters (exact match)
         if kwargs:
             for field, value in kwargs.items():
                 if ignore_none_kwarg and value is None:
                     continue
-                
                 if hasattr(cls, field):
                     query = query.filter(getattr(cls, field) == value)
-        
-        #  Sorting
+
+        # Apply complex filter expressions if provided
+        if filter_expr is not None:
+            query = query.filter(filter_expr)
+
+        # Sorting
         if order == "desc":
             query = query.order_by(sa.desc(getattr(cls, sort_by)))
         else:
             query = query.order_by(getattr(cls, sort_by))
-            
+
         # Apply search filters
         if search_fields:
             filtered_fields = {field: value for field, value in search_fields.items() if value is not None}
-            
             for field, value in filtered_fields.items():
                 query = query.filter(getattr(cls, field).ilike(f"%{value}%"))
-            
+
         count = query.count()
-            
+
         # Handle pagination
         offset = (page - 1) * per_page
         if not paginate:
@@ -233,14 +262,14 @@ class BaseTableModel(Base):
     
     @classmethod
     def search(
-        cls, 
+        cls,
         db: Session,
-        search_fields: Dict[str, str] = None, 
-        page: int = 1, 
+        search_fields: Dict[str, str] = None,
+        page: int = 1,
         per_page: int = 10,
-        sort_by: str = "created_at", 
-        order: str = "desc", 
-        filters: Dict[str, Any] = None, 
+        sort_by: str = "created_at",
+        order: str = "desc",
+        filters: Dict[str, Any] = None,
         ignore_none_filter: bool = True
     ):
         """

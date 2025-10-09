@@ -164,5 +164,7 @@ cython_debug/
 tmp
 filestorage
 logs/
-api/core/dependencies/serviceAccount.json
-api/core/dependencies/firebase_config.py
+serviceAccount.json
+firebase_config.py
+.history
+alembic/versions/*.py
