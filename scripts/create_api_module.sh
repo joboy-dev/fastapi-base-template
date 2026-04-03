@@ -198,7 +198,13 @@ from api.v1.schemas import ${file_name} as ${file_name}_schemas
 logger = create_logger(__name__)
 
 class ${file_name^}Service:
-    pass
+
+    @classmethod
+    def load_properties(cls, db: Session, ${file_name}s: List[${file_name^}]):
+        if not ${file_name}s:
+            return
+
+        task_ids = [t.id for t in ${file_name}s]
 EOF
             ;;
         *)

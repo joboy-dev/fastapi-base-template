@@ -1,5 +1,5 @@
 import logging
-import os
+import os, sys
 
 from api.utils.settings import BASE_DIR
 
@@ -42,3 +42,8 @@ def create_logger(name: str, log_file: str='logs/app_logs.log') -> logging.Logge
     logger.addHandler(console_handler)
 
     return logger
+
+def log_error(logger: logging.Logger, exc, message: str):
+    exc_type, exc_obj, exc_tb = sys.exc_info()
+    logger.error(message, stacklevel=2)
+    logger.error(f"[ERROR] - An error occured | {exc}\n{exc_type}\n{exc_obj}\nLine {exc_tb.tb_lineno}", stacklevel=2)

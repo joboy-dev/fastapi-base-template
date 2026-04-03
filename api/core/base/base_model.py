@@ -64,16 +64,28 @@ class BaseTableModel(Base):
                 obj_dict.pop(exclude, None)
             
         return obj_dict
-
+    
+    @classmethod
+    def load_properties(cls, db: Session, objects: list):
+        """
+        Override in child models if they need bulk hydration.
+        Must NOT do per-object DB calls.
+        """
+        pass
 
     @classmethod
-    def create(cls, db: Session, **kwargs):
+    def create(cls, db: Session, commit: bool = True, **kwargs):
         """Creates a new instance of the model"""
         
         obj = cls(**kwargs)
         db.add(obj)
-        db.commit()
-        db.refresh(obj)
+        if commit:
+            db.commit()
+            db.refresh(obj)
+        
+        if hasattr(cls, "load_properties"):
+            cls.load_properties(db, [obj])
+            
         return obj
 
     @classmethod
@@ -108,7 +120,11 @@ class BaseTableModel(Base):
 
         # Handle pagination
         offset = (page - 1) * per_page
-        return query, query.offset(offset).limit(per_page).all(), count
+        return_val = query, query.offset(offset).limit(per_page).all(), count
+        
+        if hasattr(cls, "load_properties"):
+            cls.load_properties(db, return_val[1])
+        return return_val
          
     
     @classmethod
@@ -117,13 +133,21 @@ class BaseTableModel(Base):
         If checking by ID fails, it checks by unique id before then throwing an error if it fails.
         """
         
-        obj = db.query(cls).filter_by(id=id, is_deleted=False).first()
-        if obj is None:
-            # Check with unique_id
-            obj = db.query(cls).filter_by(unique_id=id, is_deleted=False).first()
+        query = db.query(cls).filter(
+            cls.is_deleted == False,
+            sa.or_(
+                cls.id == id,
+                cls.unique_id == id
+            )
+        )
+        
+        obj = query.first()
             
-            if obj is None:
-                raise HTTPException(status_code=404, detail=error_message or f"Record not found in table `{cls.__tablename__}`")
+        if obj is None:
+            raise HTTPException(status_code=404, detail=error_message or f"Record not found in table `{cls.__tablename__}`")
+
+        if obj is not None and hasattr(cls, "load_properties"):
+            cls.load_properties(db, [obj])
             
         return obj
     
@@ -167,6 +191,10 @@ class BaseTableModel(Base):
         obj = query.first()
         if obj is None and throw_error:
             raise HTTPException(status_code=status_code, detail=error_message or f"Record not found in table `{cls.__tablename__}`")
+
+        if obj is not None and hasattr(cls, "load_properties"):
+            cls.load_properties(db, [obj])
+            
         return obj
     
     
@@ -224,40 +252,52 @@ class BaseTableModel(Base):
         # Handle pagination
         offset = (page - 1) * per_page
         if not paginate:
-            return query, query.all(), count
+            return_val = query, query.all(), count
         else:
-            return query, query.offset(offset).limit(per_page).all(), count
-        
+            return_val = query, query.offset(offset).limit(per_page).all(), count
+
+        if hasattr(cls, "load_properties"):
+            cls.load_properties(db, return_val[1])
+
+        return return_val
 
     @classmethod
-    def update(cls, db: Session, id: str, error_message: Optional[str] = None, **kwargs):
+    def update(cls, db: Session, id: str, commit: bool = True, error_message: Optional[str] = None, **kwargs):
         """Updates an instance with the given ID"""
         
         obj = cls.fetch_by_id(db=db, id=id, error_message=error_message)
         
         for key, value in kwargs.items():
             setattr(obj, key, value)
-        db.commit()
-        db.refresh(obj)
+        
+        if commit:
+            db.commit()
+            db.refresh(obj)
+        
+        if hasattr(cls, "load_properties"):
+            cls.load_properties(db, [obj])
+            
         return obj
     
 
     @classmethod
-    def soft_delete(cls, db: Session, id: str, error_message: Optional[str] = None):
+    def soft_delete(cls, db: Session, id: str, commit: bool = True, error_message: Optional[str] = None):
         """Performs a soft delete by setting is_deleted to True"""
         
         obj = cls.fetch_by_id(db=db, id=id, error_message=error_message)
         obj.is_deleted = True
-        db.commit()
-        
+        if commit:
+            db.commit()
+    
 
     @classmethod
-    def hard_delete(cls, db: Session, id: str, error_message: Optional[str] = None):
+    def hard_delete(cls, db: Session, id: str, commit: bool = True, error_message: Optional[str] = None):
         """Permanently deletes an instance by ID or unique_id in case ID fails."""
         
         obj = cls.fetch_by_id(db=db, id=id, error_message=error_message)
         db.delete(obj)
-        db.commit()
+        if commit:
+            db.commit()
 
     
     @classmethod
@@ -311,5 +351,9 @@ class BaseTableModel(Base):
 
         # Apply pagination
         offset = (page - 1) * per_page
-        return query, query.offset(offset).limit(per_page).all(), count
+        return_val = query, query.offset(offset).limit(per_page).all(), count
 
+        if hasattr(cls, "load_properties"):
+            cls.load_properties(db, return_val[1])
+
+        return return_val

@@ -165,6 +165,5 @@ tmp
 filestorage
 logs/
 serviceAccount.json
-firebase_config.py
 .history
 alembic/versions/*.py
